@@ -1,0 +1,42 @@
+# Byte-compiled / optimized Python files
+__pycache__/
+*.pyc
+
+
+
+
+# IDE files
+.idea/
+.vscode/
+
+# Dependency directories
+node_modules/
+bower_components/
+
+# Log files
+*.log
+
+# Database files
+*.sqlite3
+*.db
+
+# Compiled Python bytecode
+*.pyc
+
+# Django local settings
+/local_settings.py
+
+# Media files
+media/
+
+# Static files
+staticfiles/
+
+# Environment variables file
+.env
+
+# Compiled bytecode files
+*.py[cod]
+
+# Python cache
+__pycache__/
