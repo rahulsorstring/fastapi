@@ -35,6 +35,7 @@ staticfiles/
 # Environment variables file
 .env
 env/
+env
 
 # Compiled bytecode files
 *.py[cod]
