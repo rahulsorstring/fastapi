@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Request, Form, Depends, HTTPException, Response,WebSocket, Request, WebSocketDisconnect
+from fastapi import FastAPI, Request, Form, Depends, HTTPException, Response,WebSocket, Request, WebSocketDisconnect,status
 from fastapi.templating import Jinja2Templates
 from fastapi.staticfiles import StaticFiles
 from databases import Database
@@ -6,34 +6,85 @@ from sqlalchemy import MetaData, Table, Column, Integer, String
 from db import db_config
 import MySQLdb
 from typing import List
+import hashlib
+from models import *
+
 app = FastAPI()
 
+conn = MySQLdb.connect(**db_config)
+cursor = conn.cursor()
 
 # Define templates and static files directories
 app.mount("/static", StaticFiles(directory="static"), name="static")
 templates = Jinja2Templates(directory="templates")
 
 
-@app.get("/")
-async def read_notes(request: Request):
-    conn = MySQLdb.connect(**db_config)
-    cursor = conn.cursor()
 
-    # Fetch all notes from the database
-    cursor.execute("SELECT * FROM notes")
-    notes_list = cursor.fetchall()
+def authenticate_user(username: str, password: str):
+    hashed_password = hashlib.sha256(password.encode()).hexdigest()
+    cursor.execute('SELECT * FROM users WHERE username = %s', (username,))
+    user = cursor.fetchone()
 
-    # Close the cursor and database connection
-    cursor.close()
-    conn.close()
-
-    return templates.TemplateResponse("index.html", {"request": request, "notes": notes_list})
+    if user and user[2] == hashed_password:  # Assuming password is stored in the third column
+        return True
+    return False
 
 
-@app.post("/create/")
+# Dependency to check if the user is authenticated
+def get_current_user(username: str, password: str):
+    user_authenticated = authenticate_user(username, password)
+    if not user_authenticated:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid authentication credentials",
+            headers={"WWW-Authenticate": "Basic"},
+        )
+    return username
+
+# Endpoints that require authentication
+@app.post("/create_user/", tags=["users"])
+def create_user(user: User):
+  
+    hashed_password = hashlib.sha256(user.password.encode()).hexdigest()
+    # Check if the username already exists
+    cursor.execute('SELECT * FROM users WHERE username = %s', (user.username,))
+    existing_user = cursor.fetchone()
+    if existing_user:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Username already exists")
+
+    # Insert the new user into the database with hashed password
+    cursor.execute('INSERT INTO users (username, password) VALUES (%s, %s)', (user.username, hashed_password))
+    conn.commit()
+
+    return {"message": "User created successfully"}
+
+@app.post("/login/", tags=["users"])
+def login(user: User):
+    username = user.username
+    password = user.password
+
+    # Hash the provided password
+    hashed_password = hashlib.sha256(password.encode()).hexdigest()
+
+    # Execute a parameterized query to retrieve the user by username
+    cursor.execute('SELECT * FROM users WHERE username = %s', (username,))
+    fetched_user = cursor.fetchone()
+
+    # Check if the user exists and if the hashed password matches
+    if fetched_user and fetched_user[2] == hashed_password:  # Assuming password is stored in the third column
+        return {"message": "Login successful"}
+    else:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid username or password",
+            headers={"WWW-Authenticate": "Basic"},
+        )
+
+
+
+@app.post("/create/" ,tags=["Crud"])
 async def create_note(title: str = Form(...), description: str = Form(...)):
-    conn = MySQLdb.connect(**db_config)
-    cursor = conn.cursor()
+
 
     # Insert a new note into the database
     cursor.execute("INSERT INTO notes (title, description) VALUES (%s, %s)", (title, description))
@@ -48,10 +99,9 @@ async def create_note(title: str = Form(...), description: str = Form(...)):
     return {"message": "Note created successfully"}
 
 
-@app.get("/detail/{note_id}")
+@app.get("/detail/{note_id}",tags=["Crud"])
 async def read_note_detail(request: Request, note_id: int):
-    conn = MySQLdb.connect(**db_config)
-    cursor = conn.cursor()
+
 
     # Fetch the specified note from the database
     cursor.execute("SELECT * FROM notes WHERE id = %s", (note_id,))
@@ -67,10 +117,9 @@ async def read_note_detail(request: Request, note_id: int):
     return templates.TemplateResponse("detail.html", {"request": request, "note": note})
 
 
-@app.post("/update/{note_id}")
+@app.post("/update/{note_id}",tags=["Crud"])
 async def update_note(note_id: int, title: str = Form(None), description: str = Form(None)):
-    conn = MySQLdb.connect(**db_config)
-    cursor = conn.cursor()
+
 
     # Update the specified note in the database
     cursor.execute("UPDATE notes SET title = %s, description = %s WHERE id = %s", (title, description, note_id))
@@ -85,10 +134,8 @@ async def update_note(note_id: int, title: str = Form(None), description: str = 
     return {"message": "Note updated successfully"}
 
 
-@app.post("/delete/{note_id}")
+@app.post("/delete/{note_id}",tags=["Crud"])
 async def delete_note(note_id: int):
-    conn = MySQLdb.connect(**db_config)
-    cursor = conn.cursor()
 
     # Delete the specified note from the database
     cursor.execute("DELETE FROM notes WHERE id = %s", (note_id,))
@@ -102,7 +149,7 @@ async def delete_note(note_id: int):
 
     return {"message": "Note deleted successfully"}
 
-@app.get("/indexchat/")
+@app.get("/indexchat/",tags=["Chat"])
 async def chat(request:Request):
     return templates.TemplateResponse("chatindex.html",{'request':request})
 
@@ -131,7 +178,7 @@ class ConnectionManager:
             if(connection == websocket):
                 continue
             await connection.send_text(message)
-            
+
 @app.websocket("/ws/{client_id}")
 async def websocket_endpoint(websocket: WebSocket, client_id: int):
     #accept connections 

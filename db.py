@@ -21,6 +21,15 @@ cursor.execute("""
     )
 """)
 
+cursor.execute("""
+    CREATE TABLE IF NOT EXISTS users (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        username VARCHAR(50) UNIQUE,
+        password VARCHAR(255)
+    )
+""")
+
+
 # Commit the changes to the database
 conn.commit()
 
