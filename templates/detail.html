@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Note Detail</title>
+    <link href="/static/style.css" rel="stylesheet" type="text/css">
+</head>
+<body>
+    <h1>Note Detail</h1>
+    <h2>{{ note[1] }}</h2>
+    <p>{{ note[2] }}</p>
+    <a href="/">Back to Notes List</a>
+    <h2>Update Note</h2>
+    <form action="/update/{{ note[0] }}" method="post">
+        <label for="title">Title:</label><br>
+        <input type="text" id="title" name="title" value="{{ note[1] }}"><br>
+        <label for="description">Description:</label><br>
+        <textarea id="description" name="description">{{ note[2] }}</textarea><br>
+        <button type="submit">Update</button>
+    </form>
+    <h2>Delete Note</h2>
+    <form action="/delete/{{ note[0] }}" method="post">
+        <button type="submit">Delete</button>
+    </form>
+</body>
+</html>
